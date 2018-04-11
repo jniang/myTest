@@ -18,6 +18,8 @@ MODULE_LICENSE("GPL");  //the kernel cares a lot whether modules are open source
 static unsigned int myRand_major = 0;
 static struct class *myRand_class = 0;
 static struct cdev cdev; //the device
+static ri;
+static rj;
 /*
 
 DEFINE ALL YOUR RC4 STUFF HERE
@@ -28,6 +30,29 @@ DEFINE ALL YOUR RC4 STUFF HERE
 /*
   called when opening a device.  We won't do anything
  */
+//Add Two functions here: rc4Init and rc4Next
+void rc4Init(unsigned char *key, int length){
+	int i;
+	for(i = 0; i < 256; i++){
+		state[i] = i;
+	}
+	ri = rj = 0;
+
+	for(ri = 0; ri < 256; ri++){
+		rj = (rj + state[ri] + key[ri % length]) % 256;
+		swap(state[ri], state[rj]);
+	}
+	ri = rj = 0;
+}
+unsigned char rc4Next(void){
+	ri = (ri + 1) % 256;
+	rj = (rj + state[ri]) % 256;
+	swap(state[ri], state[rj]);
+	return state[(state[ri] + state[rj]) % 256];
+}
+
+
+
 int myRand_open(struct inode *inode, struct file *filp){
   return 0; //nothing to do here
 }
@@ -44,6 +69,28 @@ ssize_t myRand_read(struct file *filp, char __user *buf, size_t count, loff_t *f
 	 BE SURE NOT TO DIRECTLY DEREFERENCE A USER POINTER!
 
 */
+	unsigned char * keystream;
+	int i; 
+
+	//Keystream- allocating memory from the kernel space
+	keystream = (unsigned char*) kmalloc(sizeof(char*) * count, GFP_KERNEL);
+
+	//Keystream going to store the rc4 value
+	for(i = 0; i < count; i++){
+		keystream[i] = rc4Next();
+	}
+	//User Space Buffer: copying data from the kernel space
+	//buf used to the read the file
+	if(copy_to_user(buf, keystream, count)){
+		kfree(keystream);
+		return EFAULT;//bad bad bad address!!!
+	}
+	//buffer content needs to be printk
+	printk("Buffer Data Read: ");
+	for(i=0; i < count; i++){
+		printk("%d", buf[i]);
+	}
+	printk("\n");
   return 0;
 }
 
@@ -52,7 +99,28 @@ ssize_t myRand_write(struct file*filp, const char __user *buf, size_t count, lof
 	USE THE USER's BUFFER TO RE-INITIALIZE YOUR RC4 GENERATOR
 	BE SURE NOT TO DIRECTLY DEREFERENCE A USER POINTER!
    */
-  return 0;
+
+	//Kernel Memory Allocation
+	//ENOMEM - means out of memory 
+	unsigned char* key;
+	key = (unsigned char*) kmalloc(count, GFP_KERNEL);
+	//Null Pointer Check
+	if(!key){
+		return ENOMEM;
+	}
+	//copying chucnks of data to the kernel space from user space
+	if(copy_from_user(key, buf, count)){
+		kfree(key);
+		return EFAULT;
+	}
+	//Taking the rc4 generator going to reinitialize from user input
+	printk("Write RC4 generator: \n");
+	rc4Init(key,count);
+	//free memory
+	kfree(key, count);
+	//return # of bytes to the file
+
+  return count;
 }
 
 /* respond to seek() syscalls... by ignoring them */
