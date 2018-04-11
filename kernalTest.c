@@ -32,8 +32,17 @@ int main( int argc, char **argv ){
 		perror( "Failed device Test!!!!\n");
 		return errno;
 	}
-
+	//Adding new stuff to fix the exra garbage coming from the string instead of char array
+	printf("Keystream!!!!!");
+	for(int i = 0; i < 9; i++){
+		printf("%c", key[i]);
+	}
+	printf("\n");
 	printf("Writing Message!!!!![%s].\n", key);
+	//adding a key size check 
+	printf("Key Size Check: %lu", sizeof(key));
+	printf("\n");
+
 	//using rc4 to write to buffer
 	reinitialize = write(fileD, key, strlen(key));
 	if(reinitialize < 0){
@@ -58,7 +67,8 @@ int main( int argc, char **argv ){
 	
 	/* Test II: using the rc4 generator create a random test
 	 * Results: different data outcomes for this test
-	 */
+	//TODO: FIGURE OUT LATER numbers should be the same but is not!!!
+	//Don't need for assignment but would like to figure out why it is doing this!!
 	//write to Buffer
 	reinitialize = write(fileD, key, strlen(key));
 	//read to bufferOne
@@ -72,6 +82,7 @@ int main( int argc, char **argv ){
 	print(bufferOne, BUFFER_SIZE);
 	//Print data content of: bufferTwo
 	print(bufferTwo, BUFFER_SIZE);
+	*/
 	
 }
 

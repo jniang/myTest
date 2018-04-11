@@ -18,8 +18,10 @@ MODULE_LICENSE("GPL");  //the kernel cares a lot whether modules are open source
 static unsigned int myRand_major = 0;
 static struct class *myRand_class = 0;
 static struct cdev cdev; //the device
-static ri;
-static rj;
+static unsigned char state[256];
+static int ri;
+static int rj;
+static spinlock_t my_lock =__SPIN_LOCK_UNLOCKED();//make an unlock spinlock 
 /*
 
 DEFINE ALL YOUR RC4 STUFF HERE
@@ -71,7 +73,8 @@ ssize_t myRand_read(struct file *filp, char __user *buf, size_t count, loff_t *f
 */
 	unsigned char * keystream;
 	int i; 
-
+	// spinlock locking 
+	spin_lock(&my_lock);
 	//Keystream- allocating memory from the kernel space
 	keystream = (unsigned char*) kmalloc(sizeof(char*) * count, GFP_KERNEL);
 
@@ -91,6 +94,7 @@ ssize_t myRand_read(struct file *filp, char __user *buf, size_t count, loff_t *f
 		printk("%d", buf[i]);
 	}
 	printk("\n");
+	spin_unlock(&my_lock);
   return 0;
 }
 
@@ -104,6 +108,7 @@ ssize_t myRand_write(struct file*filp, const char __user *buf, size_t count, lof
 	//ENOMEM - means out of memory 
 	unsigned char* key;
 	key = (unsigned char*) kmalloc(count, GFP_KERNEL);
+	spin_lock(&my_lock);
 	//Null Pointer Check
 	if(!key){
 		return ENOMEM;
@@ -117,8 +122,9 @@ ssize_t myRand_write(struct file*filp, const char __user *buf, size_t count, lof
 	printk("Write RC4 generator: \n");
 	rc4Init(key,count);
 	//free memory
-	kfree(key, count);
+	kfree(key);
 	//return # of bytes to the file
+	spin_unlock(&my_lock);
 
   return count;
 }
